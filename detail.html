@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>项目详情 — 辽宁省投资项目在线审批监管平台</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; background:#f0f2f5; color:#333; padding:0 16px 40px; }
+
+.header { background: linear-gradient(135deg, #1a3a5c 0%, #2d6aa0 100%); color:#fff; margin:0 -16px 20px; padding:20px 16px; display:flex; align-items:center; gap:12px; }
+.header a { color:#fff; text-decoration:none; font-size:24px; line-height:1; }
+.header h1 { font-size:17px; font-weight:500; }
+
+.card { background:#fff; border-radius:12px; padding:20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
+.card h2 { font-size:18px; color:#1a3a5c; margin-bottom:16px; line-height:1.5; }
+.row { display:flex; padding:10px 0; border-bottom:1px solid #f5f5f5; }
+.row:last-child { border-bottom:none; }
+.row .label { width:100px; flex-shrink:0; font-size:13px; color:#888; }
+.row .value { flex:1; font-size:14px; color:#333; word-break:break-all; }
+
+.tag { display:inline-block; padding:2px 10px; border-radius:4px; font-size:12px; font-weight:600; }
+.tag-approval { background:#fff3e0; color:#e65100; }
+.tag-filing { background:#e3f2fd; color:#1565c0; }
+.tag-large { background:#e8f5e9; color:#2e7d32; }
+.tag-medium { background:#fff8e1; color:#f57f17; }
+
+.amount-highlight { font-size:22px; font-weight:700; color:#d32f2f; padding:6px 0; }
+.loading { text-align:center; padding:60px 0; color:#999; font-size:15px; }
+.error { text-align:center; padding:60px 0; }
+.error h3 { color:#d32f2f; margin-bottom:8px; }
+.error p { color:#888; font-size:14px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="index.html">←</a>
+  <h1 id="page-title">项目详情</h1>
+</div>
+
+<div id="content"><div class="loading">加载中...</div></div>
+
+<script>
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+
+  if (!code) {
+    document.getElementById('content').innerHTML = '<div class="error"><h3>缺少项目编号</h3><p>请从数据看板点击进入</p></div>';
+    return;
+  }
+
+  // 从 sessionStorage 读取数据
+  let project = null;
+  try {
+    const raw = sessionStorage.getItem('projects_data');
+    if (raw) {
+      const all = JSON.parse(raw);
+      project = all.find(p => p.code === code);
+    }
+  } catch(e) {}
+
+  if (!project) {
+    document.getElementById('content').innerHTML = '<div class="error"><h3>未找到项目数据</h3><p>项目编号: ' + code + '</p><p style="margin-top:10px">请从数据看板重新进入</p></div>';
+    return;
+  }
+
+  // 格式化金额
+  function fmtAmount(num) {
+    if (!num) return '--';
+    if (num >= 10000) return (num / 10000).toFixed(1) + '亿元';
+    return num + '万元';
+  }
+
+  const typeTag = project.type === '审批类' ? 'tag-approval' : 'tag-filing';
+  const sixColors = {
+    '新型电网': ['#e3f2fd','#1565c0'], '算力网': ['#f3e5f5','#6a1b9a'],
+    '物流网': ['#e8f5e9','#2e7d32'], '水网': ['#e0f7fa','#00695c'],
+    '城市地下管网': ['#fff3e0','#e65100'], '新一代通信网': ['#fce4ec','#c62828'],
+    '非六张网': ['#f5f5f5','#999']
+  };
+  const [sixBg, sixFg] = sixColors[project.six_net] || ['#f5f5f5','#999'];
+  let scaleTag = '';
+  if ((project.amount_num || 0) >= 10000) scaleTag = '<span class="tag tag-large">亿元级</span>';
+  else if ((project.amount_num || 0) >= 5000) scaleTag = '<span class="tag tag-medium">5000万级</span>';
+
+  document.getElementById('page-title').textContent = project.name;
+
+  const html = `
+    <div class="card">
+      <h2>${project.name}</h2>
+      <div class="amount-highlight">${project.amount || '--'} ${scaleTag}</div>
+      <div class="row"><span class="label">项目代码</span><span class="value">${project.code}</span></div>
+      <div class="row"><span class="label">项目类型</span><span class="value"><span class="tag ${typeTag}">${project.type}</span></span></div>
+      <div class="row"><span class="label">法人单位</span><span class="value">${project.entity || '--'}</span></div>
+      <div class="row"><span class="label">建设规模</span><span class="value">${project.scale || '--'}</span></div>
+      <div class="row"><span class="label">合同额</span><span class="value">${project.amount || '--'}（约${fmtAmount(project.amount_num)}）</span></div>
+      <div class="row"><span class="label">项目地点</span><span class="value">${project.region} ${project.district || ''}</span></div>
+      <div class="row"><span class="label">办理时间</span><span class="value">${project.date || '--'}</span></div>
+      <div class="row"><span class="label">六张网</span><span class="value"><span class="tag sixnet-tag" style="background:${sixBg};color:${sixFg}">${project.six_net || '非六张网'}</span></span></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:15px;color:#555;">📋 审批信息</h2>
+      <div class="row"><span class="label">审批事项</span><span class="value">${project.matter || '--'}</span></div>
+      <div class="row"><span class="label">审批部门</span><span class="value">${project.dept || '--'}</span></div>
+      <div class="row"><span class="label">所属区县</span><span class="value">${project.location || (project.region + '-' + (project.district || ''))}</span></div>
+    </div>
+  `;
+
+  document.getElementById('content').innerHTML = html;
+})();
+</script>
+</body>
+</html>

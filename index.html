@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>辽宁省投资项目在线审批监管平台 — 数据看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@cloudbase/js-sdk@2.0.0/dist/index.umd.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; background:#f0f2f5; color:#333; }
+.container { max-width:900px; margin:0 auto; }
+
+.header { background: linear-gradient(135deg, #1a3a5c 0%, #2d6aa0 100%); color:#fff; padding:28px 0; }
+.header .inner { max-width:900px; margin:0 auto; padding:0 20px; }
+.header h1 { font-size:22px; margin-bottom:6px; }
+.header p { font-size:13px; opacity:0.85; line-height:1.5; }
+.status-badge { display:inline-block; padding:2px 10px; border-radius:10px; font-size:11px; margin-left:8px; }
+.status-live { background:rgba(46,125,50,0.3); color:#a5d6a7; }
+.status-static { background:rgba(255,255,255,0.15); color:rgba(255,255,255,0.7); }
+
+.stats { display:grid; grid-template-columns: repeat(4,1fr); gap:14px; padding:20px; max-width:900px; margin:0 auto; }
+.card { background:#fff; border-radius:10px; padding:20px 16px; box-shadow:0 2px 6px rgba(0,0,0,0.06); text-align:center; transition:transform 0.2s; }
+.card:hover { transform:translateY(-2px); }
+.card .num { font-size:32px; font-weight:700; margin-bottom:6px; }
+.card .label { font-size:13px; color:#999; }
+.card.red .num { color:#d32f2f; }
+.card.green .num { color:#2e7d32; }
+.card.blue .num { color:#1565c0; }
+.card.orange .num { color:#e65100; }
+
+.section { max-width:900px; margin:0 auto 20px; padding:0 20px; }
+.section-title { font-size:15px; font-weight:600; color:#444; margin-bottom:12px; padding-left:10px; border-left:3px solid #2d6aa0; }
+
+.chart-card { background:#fff; border-radius:10px; padding:20px; box-shadow:0 2px 6px rgba(0,0,0,0.06); margin-bottom:16px; }
+.chart-card h3 { font-size:14px; color:#555; margin-bottom:16px; padding-bottom:10px; border-bottom:1px solid #f0f0f0; }
+.chart-card .chart-wrap { position:relative; height:300px; }
+
+.toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding:16px 0; }
+.toolbar input, .toolbar select { padding:8px 14px; border:1px solid #ddd; border-radius:8px; font-size:13px; outline:none; background:#fff; }
+.toolbar input:focus, .toolbar select:focus { border-color:#2d6aa0; box-shadow:0 0 0 2px rgba(45,106,160,0.1); }
+.toolbar input { flex:1; max-width:280px; }
+.table-count { font-size:12px; color:#999; margin-left:auto; white-space:nowrap; }
+
+.table-card { background:#fff; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,0.06); overflow-x:auto; -webkit-overflow-scrolling:touch; }
+.table-card table { width:100%; min-width:800px; border-collapse:collapse; }
+.table-card th { background:#f8f9fa; padding:12px 14px; text-align:left; font-size:12px; color:#888; font-weight:600; border-bottom:2px solid #f0f0f0; white-space:nowrap; position:sticky; top:0; }
+.table-card td { padding:10px 14px; font-size:13px; color:#444; border-bottom:1px solid #f5f5f5; }
+.table-card td.name-cell { max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.table-card td { word-wrap:break-word; }
+.table-card tr:hover td { background:#f6f9ff; }
+
+.tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:600; }
+.tag-approval { background:#fff3e0; color:#e65100; }
+.tag-filing { background:#e3f2fd; color:#1565c0; }
+.tag-large { background:#e8f5e9; color:#2e7d32; }
+.tag-medium { background:#fff8e1; color:#f57f17; }
+.tag-sixnet { font-size:11px; cursor:default; white-space:nowrap; }
+.tag-sixnet[data-net="新型电网"] { background:#e3f2fd; color:#1565c0; }
+.tag-sixnet[data-net="算力网"] { background:#f3e5f5; color:#6a1b9a; }
+.tag-sixnet[data-net="物流网"] { background:#e8f5e9; color:#2e7d32; }
+.tag-sixnet[data-net="水网"] { background:#e0f7fa; color:#00695c; }
+.tag-sixnet[data-net="城市地下管网"] { background:#fff3e0; color:#e65100; }
+.tag-sixnet[data-net="新一代通信网"] { background:#fce4ec; color:#c62828; }
+.tag-sixnet[data-net="非六张网"] { background:#f5f5f5; color:#999; }
+
+.footer { text-align:center; padding:24px; font-size:12px; color:#bbb; max-width:900px; margin:0 auto; }
+
+@media (max-width:768px) {
+  .stats { grid-template-columns: repeat(2,1fr); }
+  .chart-card .chart-wrap { height:250px; }
+  .toolbar { flex-direction:column; align-items:stretch; }
+  .toolbar input { max-width:100%; }
+  .table-count { margin-left:0; text-align:center; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="inner">
+    <h1>📊 辽宁省投资项目在线审批监管平台 <span id="data-status" class="status-badge status-static">静态数据</span></h1>
+    <p>办理结果公示数据看板 · 数据来源：lnzwfw.gov.cn · 更新于 <span id="update-time">--</span> · 数据范围 06-05 ~ 实时</p>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="card blue"><div class="num" id="stat-total">--</div><div class="label">项目总数(≥1000万)</div></div>
+  <div class="card orange"><div class="num" id="stat-approval">--</div><div class="label">审批类</div></div>
+  <div class="card green"><div class="num" id="stat-filing">--</div><div class="label">备案类</div></div>
+  <div class="card red"><div class="num" id="stat-investment">--</div><div class="label">预估总投资(亿元)</div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">📈 数据概览</div>
+  <div class="chart-card"><h3>项目城市分布</h3><div class="chart-wrap"><canvas id="chart-region"></canvas></div></div>
+  <div class="chart-card"><h3>💰 TOP10 项目(按合同额排序)</h3><div class="chart-wrap"><canvas id="chart-top10"></canvas></div></div>
+  <div class="chart-card"><h3>🏷️ 投资规模分布</h3><div class="chart-wrap"><canvas id="chart-scale"></canvas></div></div>
+  <div class="chart-card"><h3>📅 每日项目数趋势</h3><div class="chart-wrap"><canvas id="chart-daily"></canvas></div></div>
+</div>
+
+<div class="section">
+  <div class="section-title">📋 项目明细</div>
+  <div class="toolbar">
+    <input type="text" id="filter-name" placeholder="🔍 搜索项目名称..." oninput="renderTable()">
+    <select id="filter-type" onchange="renderTable()">
+      <option value="all">全部类型</option><option value="审批类">审批类</option><option value="备案类">备案类</option>
+    </select>
+    <select id="filter-region" onchange="onCityChange()"><option value="all">全部城市</option></select>
+    <select id="filter-district" onchange="renderTable()"><option value="all">全部区/县</option></select>
+    <select id="filter-scale" onchange="renderTable()">
+      <option value="all">全部规模</option><option value="1亿+">1亿元以上</option><option value="5000万-1亿">5000万~1亿</option><option value="1000万-5000万">1000万~5000万</option>
+    </select>
+    <select id="filter-sixnet" onchange="renderTable()">
+      <option value="all">六张网</option>
+      <option value="新型电网">⚡ 新型电网</option>
+      <option value="算力网">💻 算力网</option>
+      <option value="物流网">📦 物流网</option>
+      <option value="水网">💧 水网</option>
+      <option value="城市地下管网">🏗️ 城市地下管网</option>
+      <option value="新一代通信网">📡 新一代通信网</option>
+      <option value="非六张网">━ 非六张网</option>
+    </select>
+    <span class="table-count" id="table-count">共 -- 条</span>
+  </div>
+  <div class="table-card">
+    <table>
+      <thead><tr><th>项目名称</th><th>类型</th><th>六张网</th><th>法人单位</th><th>规模预估</th><th>合同额预估</th><th>城市</th><th>区/县</th><th>办理时间</th></tr></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="footer" id="footer">数据来源：辽宁省投资项目在线审批监管平台 (lnzwfw.gov.cn) · 估算值仅供参考</div>
+
+<script>
+// ============================================================
+// 配置: 填入你的云开发环境 ID
+// 在微信开发者工具 → 云开发 → 左上角复制环境ID
+// ============================================================
+const CLOUD_ENV_ID = 'cloudbase-d8gt4cdfv808ee2f1';
+
+// ============================================================
+// 静态备用数据 (65条, 云开发未就绪时使用)
+// ============================================================
+
+// ============================================================
+// 全局状态
+// ============================================================
+let isCloudReady = false;
+let DATA = [];
+let cloudDB = null;
+
+// 日期标准化：支持 YYYY-MM-DD / YYYY年M月D日，返回 YYYY-MM-DD
+function normalizeDateKey(d) {
+  if (!d) return '';
+  const m = d.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const m2 = d.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (m2) return `${m2[1]}-${m2[2].padStart(2,'0')}-${m2[3].padStart(2,'0')}`;
+  return d;
+}
+
+// ============================================================
+// 初始化云开发
+// ============================================================
+async function initCloud() {
+  if (!CLOUD_ENV_ID || CLOUD_ENV_ID.includes('你的环境ID')) {
+    console.log('[Cloud] 未配置环境ID, 使用静态数据');
+    return false;
+  }
+
+  const statusEl = document.getElementById('data-status');
+  statusEl.textContent = '连接中...';
+  statusEl.className = 'status-badge status-live';
+
+  try {
+    const app = tcb.init({ env: CLOUD_ENV_ID });
+    const auth = app.auth({ persistence: 'local' });
+    await auth.anonymousAuthProvider().signIn();
+    cloudDB = app.database();
+    isCloudReady = true;
+    statusEl.textContent = '实时数据';
+    statusEl.className = 'status-badge status-live';
+    document.getElementById('footer').textContent = '数据来源：辽宁省投资项目在线审批监管平台 (lnzwfw.gov.cn) · 云开发同步 · 自动更新';
+    console.log('[Cloud] 连接成功');
+    return true;
+  } catch (err) {
+    console.error('[Cloud] 连接失败:', err.message);
+    statusEl.textContent = '静态数据';
+    statusEl.className = 'status-badge status-static';
+    isCloudReady = false;
+    return false;
+  }
+}
+
+async function fetchCloudData() {
+  if (!isCloudReady || !cloudDB) return null;
+
+  try {
+    const _ = cloudDB.command;
+    const countRes = await cloudDB.collection('projects').where({ amount_num: _.gte(1000) }).count();
+    if (countRes.total === 0) {
+      console.log('[Cloud] 数据库为空, 使用静态数据');
+      return null;
+    }
+
+    const MAX_LIMIT = 1000;
+    const batches = Math.ceil(countRes.total / MAX_LIMIT);
+    let allData = [];
+
+    for (let i = 0; i < batches; i++) {
+      const res = await cloudDB.collection('projects')
+        .where({ amount_num: _.gte(1000) })
+        .orderBy('date', 'desc')
+        .orderBy('amount_num', 'desc')
+        .skip(i * MAX_LIMIT)
+        .limit(MAX_LIMIT)
+        .get();
+      allData = allData.concat(res.data);
+    }
+
+    console.log(`[Cloud] 获取 ${allData.length} 条记录`);
+    return allData;
+  } catch (err) {
+    console.error('[Cloud] 查询失败:', err.message);
+    return null;
+  }
+}
+
+// ============================================================
+// 初始化 + 渲染
+// ============================================================
+async function init() {
+  // 加载本地静态数据
+  try {
+    const res = await fetch('data.json');
+    DATA = await res.json();
+  } catch (err) {
+    console.error('[Data] 加载 data.json 失败:', err.message);
+    DATA = [];
+  }
+
+  await initCloud();
+
+  if (isCloudReady) {
+    const cloudData = await fetchCloudData();
+    if (cloudData && cloudData.length > 0) {
+      DATA = cloudData;
+    }
+  }
+
+  document.getElementById('update-time').textContent = new Date().toLocaleString('zh-CN');
+
+  // 统计
+  const filtered = DATA.filter(d => (d.amount_num || 0) >= 1000);
+  const total = filtered.length;
+  const approval = filtered.filter(d => d.type === '审批类').length;
+  const filing = filtered.filter(d => d.type === '备案类').length;
+  const totalInvest = filtered.reduce((s, d) => s + (d.amount_num || 0), 0) / 10000;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-approval').textContent = approval;
+  document.getElementById('stat-filing').textContent = filing;
+  document.getElementById('stat-investment').textContent = totalInvest.toFixed(0) + '亿';
+
+  // 城市分布图
+  const regions = {};
+  DATA.forEach(d => { regions[d.region] = (regions[d.region] || 0) + 1; });
+  const regionSorted = Object.entries(regions).sort((a, b) => b[1] - a[1]);
+  new Chart(document.getElementById('chart-region'), {
+    type: 'bar', data: { labels: regionSorted.map(r => r[0]), datasets: [{ label: '项目数', data: regionSorted.map(r => r[1]), backgroundColor: '#2d6aa0', borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+
+  // TOP10
+  const top10 = [...DATA].sort((a, b) => (b.amount_num || 0) - (a.amount_num || 0)).slice(0, 10);
+  new Chart(document.getElementById('chart-top10'), {
+    type: 'bar', data: { labels: top10.map(d => d.name.length > 10 ? d.name.slice(0, 10) + '...' : d.name), datasets: [{ label: '合同额(万元)', data: top10.map(d => d.amount_num || 0), backgroundColor: ['#d32f2f', '#e65100', '#f57f17', '#2e7d32', '#1565c0', '#6a1b9a', '#00838f', '#c62828', '#4527a0', '#00695c'], borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ctx.raw >= 10000 ? (ctx.raw / 10000).toFixed(1) + '亿元' : ctx.raw + '万元' } } } }
+  });
+
+  // 规模分布
+  const scaleGroups = { '1亿+': 0, '5000万-1亿': 0, '1000万-5000万': 0 };
+  DATA.forEach(d => {
+    if ((d.amount_num || 0) >= 10000) scaleGroups['1亿+']++;
+    else if ((d.amount_num || 0) >= 5000) scaleGroups['5000万-1亿']++;
+    else scaleGroups['1000万-5000万']++;
+  });
+  new Chart(document.getElementById('chart-scale'), {
+    type: 'doughnut', data: { labels: Object.keys(scaleGroups), datasets: [{ data: Object.values(scaleGroups), backgroundColor: ['#2d6aa0', '#e65100', '#f57f17'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+  });
+
+  // 每日趋势 — 仅展示近7天（按实际日期排序）
+  const daily = {};
+  DATA.forEach(d => {
+    const key = normalizeDateKey(d.date);
+    if (key) daily[key] = (daily[key] || 0) + 1;
+  });
+  const dailyAll = Object.entries(daily).sort((a, b) => a[0].localeCompare(b[0]));
+  const dailyLast7 = dailyAll.slice(-7);
+  new Chart(document.getElementById('chart-daily'), {
+    type: 'line', data: { labels: dailyLast7.map(d => d[0].slice(5)), datasets: [{ label: '项目数', data: dailyLast7.map(d => d[1]), borderColor: '#2d6aa0', backgroundColor: 'rgba(45,106,160,0.1)', fill: true, tension: 0.3, pointRadius: 5 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+
+  // 城市筛选器
+  const regionSelect = document.getElementById('filter-region');
+  Object.keys(regions).sort().forEach(r => { regionSelect.innerHTML += `<option value="${r}">${r}</option>`; });
+
+  // 区县筛选器（初始显示全部）
+  buildDistrictOptions();
+
+  renderTable();
+}
+
+// 城市-区县联动：城市变化时重建区县列表
+function onCityChange() {
+  buildDistrictOptions();
+  renderTable();
+}
+
+function buildDistrictOptions() {
+  const city = document.getElementById('filter-region').value;
+  const districts = {};
+  DATA.forEach(d => {
+    if (city === 'all' || d.region === city) {
+      const dis = d.district || d.region || '--';
+      districts[dis] = (districts[dis] || 0) + 1;
+    }
+  });
+  const districtSelect = document.getElementById('filter-district');
+  districtSelect.innerHTML = '<option value="all">全部区/县</option>';
+  Object.keys(districts).sort().forEach(d => {
+    districtSelect.innerHTML += `<option value="${d}">${d} (${districts[d]})</option>`;
+  });
+
+  renderTable();
+}
+
+// ============================================================
+// 表格渲染
+// ============================================================
+function renderTable() {
+  const nameFilter = document.getElementById('filter-name').value.toLowerCase();
+  const typeFilter = document.getElementById('filter-type').value;
+  const regionFilter = document.getElementById('filter-region').value;
+  const districtFilter = document.getElementById('filter-district').value;
+  const scaleFilter = document.getElementById('filter-scale').value;
+  const sixNetFilter = document.getElementById('filter-sixnet').value;
+
+  let filtered = DATA.filter(d => {
+    if (nameFilter && !d.name.toLowerCase().includes(nameFilter) && !(d.entity || '').toLowerCase().includes(nameFilter)) return false;
+    if (typeFilter !== 'all' && d.type !== typeFilter) return false;
+    if (regionFilter !== 'all' && d.region !== regionFilter) return false;
+    if (districtFilter !== 'all' && (d.district || d.region || '--') !== districtFilter) return false;
+    if (sixNetFilter !== 'all' && (d.six_net || '非六张网') !== sixNetFilter) return false;
+    const amt = d.amount_num || 0;
+    if (scaleFilter === '1亿+' && amt < 10000) return false;
+    if (scaleFilter === '5000万-1亿' && (amt < 5000 || amt >= 10000)) return false;
+    if (scaleFilter === '1000万-5000万' && (amt < 1000 || amt >= 5000)) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = filtered.map(d => {
+    const tagClass = d.type === '审批类' ? 'tag-approval' : 'tag-filing';
+    let scaleTag = '';
+    if ((d.amount_num || 0) >= 10000) scaleTag = '<span class="tag tag-large">1亿+</span>';
+    else if ((d.amount_num || 0) >= 5000) scaleTag = '<span class="tag tag-medium">5000万+</span>';
+    const sixClass = (d.six_net || '非六张网').replace(/[^\w\u4e00-\u9fff]/g, '');
+    return `<tr onclick="openDetail('${d.code}')" style="cursor:pointer">
+      <td class="name-cell" title="${d.name}">${d.name}</td>
+      <td><span class="tag ${tagClass}">${d.type}</span></td>
+      <td><span class="tag tag-sixnet" data-net="${d.six_net || '非六张网'}">${d.six_net || '非六张网'}</span></td>
+      <td title="${d.entity || ''}" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.entity || '--'}</td>
+      <td style="font-size:12px;white-space:normal;min-width:120px">${d.scale || '--'}</td>
+      <td style="white-space:normal;min-width:110px">${d.amount || '--'} ${scaleTag}</td>
+      <td style="white-space:nowrap">${d.region || '--'}</td>
+      <td style="white-space:nowrap">${d.district || d.region || '--'}</td>
+      <td style="white-space:nowrap">${d.date || '--'}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('table-count').textContent = '共 ' + filtered.length + ' 条';
+}
+
+// 跳转项目详情
+function openDetail(code) {
+  try { sessionStorage.setItem('projects_data', JSON.stringify(DATA)); } catch(e) {}
+  window.location.href = 'detail.html?code=' + encodeURIComponent(code);
+}
+
+// 启动
+init();
+</script>
+</body>
+</html>
